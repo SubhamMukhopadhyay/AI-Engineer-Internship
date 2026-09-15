@@ -1,0 +1,30 @@
+# Environments / secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Streamlit
+.streamlit/
+
+# Vector store / cache artifacts
+*.faiss
+*.index
+.cache/
+data/uploads/
+data/index/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# Docker
+*.log
