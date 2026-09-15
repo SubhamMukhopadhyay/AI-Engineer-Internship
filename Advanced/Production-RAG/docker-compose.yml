@@ -1,0 +1,53 @@
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: production-rag-backend:latest
+    container_name: production-rag-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_BASE_URL=${LLM_BASE_URL}
+      - LLM_MODEL=${LLM_MODEL}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-all-MiniLM-L6-v2}
+      - RERANKER_MODEL=${RERANKER_MODEL:-cross-encoder/ms-marco-MiniLM-L-6-v2}
+      - USE_RERANKER=${USE_RERANKER:-true}
+      - CHUNK_SIZE=${CHUNK_SIZE:-1000}
+      - CHUNK_OVERLAP=${CHUNK_OVERLAP:-180}
+      - RETRIEVAL_TOP_K=${RETRIEVAL_TOP_K:-8}
+      - RERANK_TOP_K=${RERANK_TOP_K:-4}
+      - MAX_FILE_SIZE_MB=${MAX_FILE_SIZE_MB:-25}
+      - INDEX_DIR=/app/data/index
+      - UPLOAD_DIR=/app/data/uploads
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - rag-index-data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: production-rag-frontend:latest
+    container_name: production-rag-frontend
+    ports:
+      - "8501:8501"
+    environment:
+      - BACKEND_URL=http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  rag-index-data:
