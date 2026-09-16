@@ -24,7 +24,21 @@ Why this design:
 from __future__ import annotations
 
 import os
+import re
 import requests
+
+# Invisible/control characters that sometimes survive a copy-paste from
+# rich text sources (smart keyboards, notes apps, chat UIs) but are
+# invalid inside a URL/API key and cause silent 404s or auth failures.
+# We strip these everywhere in the string, not just the ends.
+_INVISIBLE_CHARS_RE = re.compile(
+    "[\u200b\u200c\u200d\u200e\u200f\ufeff\u00a0\u2028\u2029\r\n\t]"
+)
+
+
+def _sanitize(value: str) -> str:
+    value = _INVISIBLE_CHARS_RE.sub("", value)
+    return value.strip()
 
 
 class LLMConfigError(Exception):
@@ -37,9 +51,9 @@ class LLMRequestError(Exception):
 
 class LLMClient:
     def __init__(self) -> None:
-        self.api_key = os.getenv("LLM_API_KEY", "").strip()
-        self.base_url = os.getenv("LLM_BASE_URL", "").strip().rstrip("/")
-        self.model = os.getenv("LLM_MODEL", "").strip()
+        self.api_key = _sanitize(os.getenv("LLM_API_KEY", ""))
+        self.base_url = _sanitize(os.getenv("LLM_BASE_URL", "")).rstrip("/")
+        self.model = _sanitize(os.getenv("LLM_MODEL", ""))
 
     def is_configured(self) -> bool:
         return bool(self.api_key and self.base_url and self.model)
@@ -110,8 +124,10 @@ class LLMClient:
                 "Authentication failed (401). Check that LLM_API_KEY is correct."
             )
         if resp.status_code == 404:
+            body_preview = resp.text[:200] if resp.text else "(empty body)"
             raise LLMRequestError(
-                f"Endpoint not found (404) at '{url}'. Check LLM_BASE_URL."
+                f"Endpoint not found (404) at '{resp.url}'. "
+                f"Check LLM_BASE_URL. Provider response: {body_preview}"
             )
         if resp.status_code == 429:
             raise LLMRequestError(
